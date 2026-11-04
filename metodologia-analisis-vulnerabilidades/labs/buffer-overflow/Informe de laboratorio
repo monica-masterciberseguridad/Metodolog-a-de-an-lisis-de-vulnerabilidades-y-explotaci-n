@@ -1,0 +1,183 @@
+# Laboratorio 1 – Análisis de Buffer Overflow
+
+## 1. Introducción
+
+En este laboratorio se ha desarrollado un ejercicio práctico para comprender cómo se produce un desbordamiento de búfer (Buffer Overflow), cómo puede detectarse mediante herramientas de análisis dinámico y qué medidas pueden aplicarse para corregirlo.
+
+La práctica se ha realizado en Ubuntu mediante WSL2 sobre Windows, utilizando el lenguaje C y AddressSanitizer.
+
+## 2. Objetivos
+
+- Comprender el funcionamiento de un buffer en memoria.
+- Identificar una escritura fuera de los límites de memoria.
+- Reproducir un Buffer Overflow en un programa de laboratorio.
+- Utilizar AddressSanitizer para detectar el error.
+- Analizar el resultado obtenido.
+- Corregir el código y verificar la solución.
+
+## 3. Entorno de trabajo
+
+El laboratorio se ha realizado con la siguiente configuración:
+
+| Elemento | Versión o configuración |
+|---|---|
+| Sistema operativo | Ubuntu mediante WSL2 |
+| Arquitectura | x86_64 |
+| Clang | 21.1.8 |
+| GCC | 15.2.0 |
+| GDB | 17.1 |
+| Lenguaje | C |
+| Detector de errores | AddressSanitizer |
+
+## 4. Desarrollo de la práctica
+
+### 4.1. Creación del programa vulnerable
+
+Se desarrolló un programa en C que reserva un buffer de 16 bytes y recibe una cadena de texto como argumento.
+
+El problema se encontraba en la utilización de la función `strcpy()`, que realiza la copia sin comprobar previamente si la cadena de entrada cabe en el espacio reservado.
+
+Código original:
+
+```c
+char buffer[16];
+strcpy(buffer, argv[1]);
+```
+
+Esta implementación permite que una entrada demasiado larga provoque una escritura fuera de los límites del buffer.
+
+### 4.2. Compilación con AddressSanitizer
+
+Se utilizó Clang para compilar el programa incorporando AddressSanitizer:
+
+```bash
+clang -g -O0 -fsanitize=address -fno-omit-frame-pointer demo.c -o demo
+```
+
+Esta configuración permite detectar determinados errores relacionados con el acceso a memoria durante la ejecución.
+
+### 4.3. Prueba con una entrada normal
+
+Se ejecutó el programa con una entrada de pequeño tamaño:
+
+```bash
+./demo hola
+```
+
+Resultado obtenido:
+
+```text
+Entrada: hola
+```
+
+La ejecución terminó correctamente, ya que la cadena introducida cabía dentro del buffer.
+
+### 4.4. Reproducción del Buffer Overflow
+
+A continuación, se introdujo una cadena de 20 caracteres:
+
+```bash
+./demo 12345678901234567890
+```
+
+AddressSanitizer detectó el siguiente error:
+
+```text
+ERROR: AddressSanitizer: stack-buffer-overflow
+```
+
+El informe identificó una escritura de 21 bytes sobre una variable denominada `buffer`, cuyo espacio reservado era de 16 bytes.
+
+La diferencia se debe a que la cadena también necesita un byte adicional para almacenar el carácter terminador nulo (`\0`).
+
+Este resultado confirmó la existencia de una escritura fuera de los límites del buffer.
+
+### 4.5. Corrección de la vulnerabilidad
+
+Se modificó el programa incorporando una comprobación previa de longitud:
+
+```c
+if (strlen(argv[1]) >= sizeof(buffer)) {
+    fprintf(stderr, "Error: entrada demasiado larga\n");
+    return 1;
+}
+```
+
+De esta manera, el programa rechaza las entradas que superan la capacidad disponible antes de realizar la copia.
+
+### 4.6. Validación de la corrección
+
+Después de modificar el código, se volvió a compilar con AddressSanitizer.
+
+Se realizaron dos pruebas:
+
+**Prueba 1: entrada válida**
+
+```bash
+./demo hola
+```
+
+Resultado:
+
+```text
+Entrada: hola
+```
+
+**Prueba 2: entrada demasiado larga**
+
+```bash
+./demo 12345678901234567890
+```
+
+Resultado:
+
+```text
+Error: entrada demasiado larga
+```
+
+La entrada excesiva fue rechazada antes de realizar la copia y no se produjo el error de memoria detectado anteriormente.
+
+## 5. Análisis técnico
+
+La práctica demuestra cómo una operación de copia sin validación de límites puede provocar una escritura fuera de los límites de memoria.
+
+La utilización de AddressSanitizer permitió identificar el problema durante la ejecución y obtener información sobre la variable afectada y la operación que provocó el error.
+
+La corrección mediante una comprobación de longitud impide que el programa copie cadenas que superen la capacidad del buffer.
+
+También se ha comprobado la importancia de repetir las pruebas después de modificar el código para verificar que la solución funciona.
+
+## 6. Conclusiones
+
+Este laboratorio ha permitido comprender de forma práctica el funcionamiento de un Buffer Overflow y las consecuencias que puede tener una gestión incorrecta de memoria.
+
+Se ha comprobado que una entrada aparentemente sencilla puede provocar un error de seguridad cuando el programa no controla adecuadamente los límites de sus estructuras de datos.
+
+La utilización de AddressSanitizer ha resultado especialmente útil para detectar y analizar el problema.
+
+Como conclusión, considero que la validación de entradas, el control de tamaños y el uso de herramientas de análisis dinámico son elementos fundamentales para desarrollar software más seguro.
+
+## 7. Evidencias
+
+Las evidencias de esta práctica se encuentran en el directorio:
+
+`evidence/screenshots/`
+
+Incluyen:
+
+1. Instalación y comprobación del entorno Linux.
+2. Instalación de herramientas de análisis.
+3. Código original vulnerable.
+4. Compilación del programa.
+5. Ejecución con entrada normal.
+6. Detección del desbordamiento mediante AddressSanitizer.
+7. Código corregido.
+8. Validación de la corrección.
+
+## 8. Herramientas y referencias
+
+- Clang: https://clang.llvm.org/
+- GDB: https://www.sourceware.org/gdb/
+- AddressSanitizer: https://clang.llvm.org/docs/AddressSanitizer.html
+- Ubuntu: https://ubuntu.com/
+- MITRE CWE-787: https://cwe.mitre.org/data/definitions/787.html
